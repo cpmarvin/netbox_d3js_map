@@ -1,0 +1,81 @@
+diff --git a/netbox/extras/urls.py b/netbox/extras/urls.py
+index edc3ffc..8bea155 100644
+--- a/netbox/extras/urls.py
++++ b/netbox/extras/urls.py
+@@ -42,4 +42,7 @@ urlpatterns = [
+     path(r'scripts/', views.ScriptListView.as_view(), name='script_list'),
+     path(r'scripts/<str:module>/<str:name>/', views.ScriptView.as_view(), name='script'),
+ 
++    #NetworkMap
++    path(r'networkmap/', views.NetworkMap.as_view(), name='networkmap'),
++
+ ]
+diff --git a/netbox/extras/views.py b/netbox/extras/views.py
+index c8dc2f3..c32969f 100644
+--- a/netbox/extras/views.py
++++ b/netbox/extras/views.py
+@@ -422,3 +422,26 @@ class ScriptView(PermissionRequiredMixin, View):
+             'output': output,
+             'execution_time': execution_time,
+         })
++
++#Start of topology
++from .mutils import get_netbox_connections
++import json
++
++class NetworkMap(PermissionRequiredMixin, View):
++    """
++    This is a copy or Reports from Netbox modify to display topology
++    """
++    permission_required = 'extras.view_reportresult'
++
++    def get(self, request):
++        #get netbox router to router connection , funcion in mutils.py
++        df = get_netbox_connections()
++        #dummy date for util and capacity
++        df['util']='0'
++        df['capacity']='0'
++        #print(df)
++        rtr_links = df.to_dict(orient='records')
++        rtr_links_json = json.dumps(rtr_links)
++        return render(request, 'extras/network_map.html',{
++            'rtr_links':rtr_links_json,
++        })
+diff --git a/netbox/templates/_base.html b/netbox/templates/_base.html
+index 0dfd7c8..ccb15a9 100644
+--- a/netbox/templates/_base.html
++++ b/netbox/templates/_base.html
+@@ -71,6 +71,10 @@
+ <script src="{% static 'select2-4.0.5/js/select2.min.js' %}"></script>
+ <script src="{% static 'clipboard-2.0.4.min.js' %}"></script>
+ <script src="{% static 'js/forms.js' %}?v{{ settings.VERSION }}"></script>
++
++<script src="{% static 'js/d3js_v5_utils.js' %}"></script>
++<script src="{% static 'js/lnet_d3js.js' %}"></script>
++
+ <script type="text/javascript">
+     var netbox_api_path = "/{{ settings.BASE_PATH }}api/";
+     var loading = $(".loading");
+diff --git a/netbox/templates/inc/nav_menu.html b/netbox/templates/inc/nav_menu.html
+index 3379c05..0e3d8ed 100644
+--- a/netbox/templates/inc/nav_menu.html
++++ b/netbox/templates/inc/nav_menu.html
+@@ -16,7 +16,7 @@
+         <div id="navbar" class="navbar-collapse collapse">
+             {% if request.user.is_authenticated or not settings.LOGIN_REQUIRED %}
+             <ul class="nav navbar-nav">
+-                <li class="dropdown{% if request.path|contains:'/dcim/sites/,/dcim/regions/,/tenancy/,/extras/tags/,/extras/reports/' %} active{% endif %}">
++                <li class="dropdown{% if request.path|contains:'/dcim/sites/,/dcim/regions/,/tenancy/,/extras/tags/,/extras/reports/,/extras/networkmap/' %} active{% endif %}">
+                     <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Organization <span class="caret"></span></a>
+                     <ul class="dropdown-menu">
+                         <li class="dropdown-header">Sites</li>
+@@ -72,6 +72,9 @@
+                         <li{% if not perms.extras.view_reportresult %} class="disabled"{% endif %}>
+                             <a href="{% url 'extras:report_list' %}">Reports</a>
+                         </li>
++                        <li{% if not perms.extras.view_reportresult %} class="disabled"{% endif %}>
++                            <a href="{% url 'extras:networkmap' %}">Network Map</a>
++                        </li>
+                         <li{% if not perms.extras.view_objectchange %} class="disabled"{% endif %}>
+                             <a href="{% url 'extras:objectchange_list' %}">Changelog</a>
+                         </li>
